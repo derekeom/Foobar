@@ -1,11 +1,17 @@
 #include <iostream>
-#include "Diagnostics/Stopwatch.h"
+#include <thread>
+#include <variant>
 
 using namespace std;
+
+void Func()
+{
+}
 
 int main()
 {
     cout << "Hello World!\n";
+    Func();
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
