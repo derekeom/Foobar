@@ -8,7 +8,14 @@
 #define PCH_H
 
 // add headers that you want to pre-compile here
+#include <array>
 #include <chrono>
+#include <future>
+#include <stdexcept>
 #include <thread>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #endif //PCH_H

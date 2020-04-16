@@ -1,9 +1,9 @@
 #include "pch.h"
 #include "CppUnitTest.h"
-#include "../Foobar/src/Stopwatch.h"
+#include "../Foobar/src/stopwatch.h"
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
-TEST_CLASS(StopwatchTest)
+TEST_CLASS(stopwatch_test)
 {
 	const std::chrono::milliseconds default_sleep_time = std::chrono::milliseconds(10);
 	const std::chrono::milliseconds time_epsilon = std::chrono::milliseconds(5);
