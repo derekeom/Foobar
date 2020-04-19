@@ -151,6 +151,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\blocking_queue.h" />
     <ClInclude Include="src\concurrent_skiplist.h" />
     <ClInclude Include="src\stopwatch.h" />
   </ItemGroup>

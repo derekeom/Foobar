@@ -15,5 +15,8 @@
     <ClInclude Include="src\concurrent_skiplist.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\blocking_queue.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
