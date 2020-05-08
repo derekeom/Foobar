@@ -149,11 +149,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\thread_pool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\blocking_queue.h" />
     <ClInclude Include="src\concurrent_skiplist.h" />
     <ClInclude Include="src\stopwatch.h" />
+    <ClInclude Include="src\thread_pool.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
