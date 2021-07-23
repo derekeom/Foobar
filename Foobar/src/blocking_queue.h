@@ -20,6 +20,14 @@ public:
 	{
 	}
 
+	~blocking_queue()
+	{
+		// Default destructor can cause stack overflow.
+		while (_head) {
+			_head = std::move(_head->next);
+		}
+	}
+
 	void push(value_t value)
 	{
 		auto new_value = std::make_unique<value_t>(std::move(value));
@@ -59,10 +67,10 @@ public:
 			throw std::invalid_argument("out_value is null");
 		}
 
-		std::lock_guard<std::mutex> lock(_head_mutex);
+		std::unique_lock<std::mutex> lock(_head_mutex);
 		_not_empty_cond_var.wait(lock, [this] { return _head.get() != tail(); });
 
-		*out_value = std::move(_head->value);
+		*out_value = std::move(*_head->value.get());
 		_head = std::move(_head->next);
 	}
 
