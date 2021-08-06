@@ -1,4 +1,5 @@
 #include <atomic>
+#include <chrono>
 #include <iostream>
 #include <functional>
 #include <future>
@@ -10,6 +11,7 @@
 #include <vector>
 
 using namespace std;
+using namespace std::chrono_literals;
 
 void func()
 {

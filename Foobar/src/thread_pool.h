@@ -56,7 +56,8 @@ class thread_pool
 
 	public:
 		template<typename function_t>
-		task(function_t&& func) : _callable(new callable<function_t>(std::move(func)))
+		task(function_t&& func)
+			: _callable(std::make_unique<callable<function_t>>(std::move(func)))
 		{
 		}
 
@@ -124,15 +125,15 @@ class thread_pool
 	};
 
 public:
-	thread_pool()
+	thread_pool(size_t num_threads = std::thread::hardware_concurrency())
 		: _done(false)
-		, _queues(std::thread::hardware_concurrency())
+		, _queues(num_threads)
 		, _joiner(_threads)
 	{
 		try
 		{
 			for (size_t i = 0; i < _queues.size(); ++i) {
-				_threads.push_back(std::thread(&thread_pool::worker_thread, this, i));
+				_threads.emplace_back(&thread_pool::worker_thread, this, i);
 			}
 		}
 		catch (...)
@@ -153,14 +154,14 @@ public:
 		using result_t = std::invoke_result_t<function_t>;
 		std::packaged_task<result_t()> task(func);
 		std::future<result_t> result(task.get_future());
-		
+
 		if (s_local_work_queue) {
 			s_local_work_queue->push(std::move(task));
 		}
 		else {
 			_pool_work_queue.push(std::move(task));
 		}
-		
+
 		return result;
 	}
 

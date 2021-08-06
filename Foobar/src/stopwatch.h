@@ -1,86 +1,75 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 
 class stopwatch
 {
 public:
-	stopwatch();
+	stopwatch()
+	{
+		reset();
+	}
 
-	void reset();
-	void restart();
-	void start();
-	void stop();
+	void reset()
+	{
+		_elapsed_nano = std::chrono::nanoseconds::zero();
+		set_not_running();
+	}
 
-	long long elapsed_milliseconds() const;
-	bool running() const;
+	void restart()
+	{
+		reset();
+		start();
+	}
+
+	void start()
+	{
+		if (!running())
+		{
+			set_running();
+		}
+	}
+
+	void stop()
+	{
+		_elapsed_nano += running_nanoseconds();
+		set_not_running();
+	}
+
+	int64_t elapsed_milliseconds() const
+	{
+		auto elapsed_nano = _elapsed_nano + running_nanoseconds();
+		auto elapsed_milli = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_nano);
+		return elapsed_milli.count();
+	}
+
+	bool running() const
+	{
+		return _start_time != not_running;
+	}
 
 private:
-	void set_not_running();
-	void set_running();
-	std::chrono::nanoseconds running_nanoseconds() const;
-
-	std::chrono::high_resolution_clock::time_point _startTime;
-	std::chrono::nanoseconds _elapsedNanoseconds;
-};
-
-inline stopwatch::stopwatch()
-{
-	reset();
-}
-
-inline void stopwatch::reset()
-{
-	_elapsedNanoseconds = std::chrono::nanoseconds::zero();
-	set_not_running();
-}
-
-inline void stopwatch::restart()
-{
-	reset();
-	start();
-}
-
-inline void stopwatch::start()
-{
-	if (!running())
+	void set_not_running()
 	{
-		set_running();
+		_start_time = not_running;
 	}
-}
 
-inline void stopwatch::stop()
-{
-	_elapsedNanoseconds += running_nanoseconds();
-	set_not_running();
-}
+	void set_running()
+	{
+		_start_time = std::chrono::high_resolution_clock::now();
+	}
 
-inline long long stopwatch::elapsed_milliseconds() const
-{
-	auto elapsedNano = _elapsedNanoseconds + running_nanoseconds();
-	auto elapsedMilli = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedNano);
-	return elapsedMilli.count();
-}
+	std::chrono::nanoseconds running_nanoseconds() const
+	{
+		return running()
+			? std::chrono::high_resolution_clock::now() - _start_time
+			: std::chrono::nanoseconds::zero();
+	}
 
-inline bool stopwatch::running() const
-{
-	return _startTime != std::chrono::high_resolution_clock::time_point::min();
-}
+	std::chrono::high_resolution_clock::time_point _start_time;
+	std::chrono::nanoseconds _elapsed_nano;
 
-inline void stopwatch::set_not_running()
-{
-	_startTime = std::chrono::high_resolution_clock::time_point::min();
-}
-
-inline void stopwatch::set_running()
-{
-	_startTime = std::chrono::high_resolution_clock::now();
-}
-
-inline std::chrono::nanoseconds stopwatch::running_nanoseconds() const
-{
-	return running()
-		? std::chrono::high_resolution_clock::now() - _startTime
-		: std::chrono::nanoseconds::zero();
-}
-
+	static constexpr std::chrono::high_resolution_clock::time_point not_running
+		= std::chrono::high_resolution_clock::time_point::min();
+};
