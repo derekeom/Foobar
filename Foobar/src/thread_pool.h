@@ -43,21 +43,21 @@ class thread_pool
 			virtual ~callable_base() {}
 		};
 
-		template <typename function_t>
+		template <typename Function>
 		class callable : public callable_base
 		{
 		public:
-			callable(function_t&& f) : _func(std::move(f)) {}
+			callable(Function&& f) : _func(std::move(f)) {}
 			void call() override { _func(); }
 
 		private:
-			function_t _func;
+			Function _func;
 		};
 
 	public:
-		template<typename function_t>
-		task(function_t&& func)
-			: _callable(std::make_unique<callable<function_t>>(std::move(func)))
+		template<typename Function>
+		task(Function&& func)
+			: _callable(std::make_unique<callable<Function>>(std::move(func)))
 		{
 		}
 
@@ -148,10 +148,10 @@ public:
 		_done = true;
 	}
 
-	template <typename function_t>
-	std::future<std::invoke_result_t<function_t>> submit(function_t func)
+	template <typename Function>
+	std::future<std::invoke_result_t<Function>> submit(Function func)
 	{
-		using result_t = std::invoke_result_t<function_t>;
+		using result_t = std::invoke_result_t<Function>;
 		std::packaged_task<result_t()> task(func);
 		std::future<result_t> result(task.get_future());
 

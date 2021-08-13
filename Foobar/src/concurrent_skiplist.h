@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <utility>
 
-template <typename key_t, typename value_t>
+template <typename Key, typename Value>
 class concurrent_skiplist
 {
 	using transferable_lock = std::unique_lock<std::mutex>;
@@ -16,11 +16,11 @@ class concurrent_skiplist
 	class node
 	{
 	public:
-		node(int levels) : node(key_t{}, value_t{}, levels)
+		node(int levels) : node(Key{}, Value{}, levels)
 		{
 		}
 
-		node(key_t key, value_t&& value, int levels)
+		node(Key key, Value&& value, int levels)
 			: _key(std::move(key))
 			, _forward(std::make_unique<node* []>(levels))
 			, _forward_mutexes(std::make_unique<std::mutex[]>(levels))
@@ -29,18 +29,18 @@ class concurrent_skiplist
 		{
 		}
 
-		const key_t& key() const
+		const Key& key() const
 		{
 			return _key;
 		}
 
-		value_t value() const
+		Value value() const
 		{
 			std::shared_lock<std::shared_mutex> lock(_value_mutex);
 			return _value;
 		}
 
-		void set_value(value_t&& value)
+		void set_value(Value&& value)
 		{
 			std::unique_lock<std::shared_mutex> lock(_value_mutex);
 			_value = std::move(value);
@@ -72,11 +72,11 @@ class concurrent_skiplist
 		}
 
 	private:
-		const key_t _key;
+		const Key _key;
 		std::unique_ptr<node* []> _forward;
 		std::unique_ptr<std::mutex[]> _forward_mutexes;
 		const int _top_level;
-		value_t _value;
+		Value _value;
 		mutable std::shared_mutex _value_mutex;
 		std::mutex _modify_mutex;
 	};
@@ -121,16 +121,16 @@ public:
 
 	~concurrent_skiplist()
 	{
-		auto current = _head;
+		node* current = _head;
 		while (current)
 		{
-			auto next = current->forward(_bottom_level);
+			node* next = current->forward(_bottom_level);
 			delete current;
 			current = next;
 		}
 	}
 
-	bool try_get_value(const key_t& key, value_t* out_value) const
+	bool try_get_value(const Key& key, Value* out_value) const
 	{
 		if (out_value == nullptr) {
 			throw std::invalid_argument("out_value is null");
@@ -158,26 +158,26 @@ public:
 		return false;
 	}
 
-	void add_or_update(const key_t& key, value_t value)
+	void add_or_update(const Key& key, Value value)
 	{
 		add_or_update(key, value, /*add*/true, /*update*/true);
 	}
 
-	bool try_add(const key_t& key, value_t value)
+	bool try_add(const Key& key, Value value)
 	{
 		return add_or_update(key, value, /*add*/true, /*update*/false);
 	}
 
-	bool try_update(const key_t& key, value_t value)
+	bool try_update(const Key& key, Value value)
 	{
 		return add_or_update(key, value, /*add*/false, /*update*/true);
 	}
 
-	bool try_remove(const key_t& key)
+	bool try_remove(const Key& key)
 	{
 		std::array<node*, _max_levels> update;
 		auto top_level_hint = _top_level_hint;
-		auto current = search(key, top_level_hint, &update);
+		node* current = search(key, top_level_hint, &update);
 		transferable_lock modify_lock;
 
 		while (true)
@@ -188,8 +188,8 @@ public:
 			}
 
 			modify_lock = current->lock_for_modify();
-			auto next = current->forward(_bottom_level);
-			auto is_garbage = compare_greater(current, next);
+			node* next = current->forward(_bottom_level);
+			bool is_garbage = compare_greater(current, next);
 			if (compare_equal(current, key) && !is_garbage) {
 				break;
 			}
@@ -204,7 +204,7 @@ public:
 
 		for (int i = current->top_level(); i >= _bottom_level; --i)
 		{
-			auto previous = update[i];
+			node* previous = update[i];
 			auto previous_lock = find_and_lock(&previous, key, i);
 			auto current_lock = current->lock(i);
 			previous->set_forward(current->forward(i), i);
@@ -221,8 +221,8 @@ public:
 
 private:
 	bool add_or_update(
-		const key_t& search_key,
-		value_t& value,
+		const Key& search_key,
+		Value& value,
 		bool add_if_no_exist,
 		bool update_if_exist)
 	{
@@ -275,11 +275,11 @@ private:
 
 	template<int array_size>
 	node* search(
-		const key_t& search_key,
+		const Key& search_key,
 		int top_level,
 		std::array<node*, array_size>* update)
 	{
-		auto previous = _head;
+		node* previous = _head;
 		for (int i = top_level; i >= _bottom_level; --i)
 		{
 			auto current = previous->forward(i);
@@ -295,11 +295,11 @@ private:
 
 	transferable_lock find_and_lock(
 		node** current_ptr,
-		const key_t& search_key,
+		const Key& search_key,
 		int level)
 	{
-		auto current = *current_ptr;
-		auto next = current->forward(level);
+		node* current = *current_ptr;
+		node* next = current->forward(level);
 
 		while (compare_less(next, search_key))
 		{
@@ -352,7 +352,7 @@ private:
 		}
 	}
 
-	int compare(const node* a, const key_t& search_key) const
+	int compare(const node* a, const Key& search_key) const
 	{
 		if (a == _head) {
 			return -1;
@@ -386,7 +386,7 @@ private:
 		return a->key() < b->key() ? -1 : 1;
 	}
 
-	bool compare_less(const node* a, const key_t& search_key) const
+	bool compare_less(const node* a, const Key& search_key) const
 	{
 		return compare(a, search_key) == -1;
 	}
@@ -396,7 +396,7 @@ private:
 		return compare(a, b) == -1;
 	}
 
-	bool compare_equal(const node* a, const key_t& search_key) const
+	bool compare_equal(const node* a, const Key& search_key) const
 	{
 		return compare(a, search_key) == 0;
 	}
@@ -406,7 +406,7 @@ private:
 		compare(a, b) == 0;
 	}
 
-	bool compare_greater(const node* a, const key_t& search_key) const
+	bool compare_greater(const node* a, const Key& search_key) const
 	{
 		return compare(a, search_key) == 1;
 	}
