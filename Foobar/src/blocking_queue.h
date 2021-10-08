@@ -1,4 +1,5 @@
 #pragma once
+
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -35,13 +36,13 @@ public:
 		auto new_tail = std::make_unique<node>();
 		
 		{
-			std::lock_guard<std::mutex> lock(_tail_mutex);
+			std::scoped_lock<std::mutex> lock(_tail_mutex);
 			_tail->value = std::move(new_value);
 			_tail->next = std::move(new_tail);
 			_tail = _tail->next.get();
 		}
 
-		_not_empty_cond_var.notify_one();
+		_not_empty_condition.notify_one();
 	}
 
 	bool try_pop(Value* out_value)
@@ -50,7 +51,7 @@ public:
 			throw std::invalid_argument("out_value is null");
 		}
 
-		std::lock_guard<std::mutex> lock(_head_mutex);
+		std::scoped_lock<std::mutex> lock(_head_mutex);
 		
 		if (_head.get() == tail()) {
 			return false;
@@ -69,7 +70,7 @@ public:
 		}
 
 		std::unique_lock<std::mutex> lock(_head_mutex);
-		_not_empty_cond_var.wait(lock, [this] { return _head.get() != tail(); });
+		_not_empty_condition.wait(lock, [this] { return _head.get() != tail(); });
 
 		*out_value = std::move(*_head->value.get());
 		_head = std::move(_head->next);
@@ -77,14 +78,14 @@ public:
 
 	bool empty() const
 	{
-		std::lock_guard<std::mutex> lock(_head_mutex);
+		std::scoped_lock<std::mutex> lock(_head_mutex);
 		return _head.get() == tail();
 	}
 
 private:
 	node* tail() const
 	{
-		std::lock_guard<std::mutex> lock(_tail_mutex);
+		std::scoped_lock<std::mutex> lock(_tail_mutex);
 		return _tail;
 	}
 
@@ -92,5 +93,5 @@ private:
 	std::unique_ptr<node> _head;
 	mutable std::mutex _tail_mutex;
 	node* _tail;
-	std::condition_variable _not_empty_cond_var;
+	std::condition_variable _not_empty_condition;
 };

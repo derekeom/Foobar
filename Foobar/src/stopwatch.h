@@ -39,20 +39,26 @@ public:
 
 	int64_t elapsed_milliseconds() const
 	{
-		auto elapsed_nano = _elapsed_nano + running_nanoseconds();
-		auto elapsed_milli = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_nano);
+		const auto elapsed_nano = _elapsed_nano + running_nanoseconds();
+		const auto elapsed_milli = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_nano);
 		return elapsed_milli.count();
+	}
+
+	int64_t elapsed_nanoseconds() const
+	{
+		const auto elapsed_nano = _elapsed_nano + running_nanoseconds();
+		return elapsed_nano.count();
 	}
 
 	bool running() const
 	{
-		return _start_time != not_running;
+		return _start_time != NOT_RUNNING;
 	}
 
 private:
 	void set_not_running()
 	{
-		_start_time = not_running;
+		_start_time = NOT_RUNNING;
 	}
 
 	void set_running()
@@ -70,6 +76,6 @@ private:
 	std::chrono::high_resolution_clock::time_point _start_time;
 	std::chrono::nanoseconds _elapsed_nano;
 
-	static constexpr std::chrono::high_resolution_clock::time_point not_running
+	static constexpr std::chrono::high_resolution_clock::time_point NOT_RUNNING
 		= std::chrono::high_resolution_clock::time_point::min();
 };

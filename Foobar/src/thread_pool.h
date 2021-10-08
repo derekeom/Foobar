@@ -1,4 +1,7 @@
 #pragma once
+
+#include "blocking_queue.h"
+
 #include <atomic>
 #include <functional>
 #include <future>
@@ -8,38 +11,14 @@
 #include <thread>
 #include <vector>
 
-#include "blocking_queue.h"
-
 class thread_pool
 {
-	class thread_guard
-	{
-	public:
-		explicit thread_guard(std::vector<std::thread>& threads)
-			: _threads(threads)
-		{
-		}
-
-		~thread_guard()
-		{
-			for (auto& thread : _threads)
-			{
-				if (thread.joinable()) {
-					thread.join();
-				}
-			}
-		}
-
-	private:
-		std::vector<std::thread>& _threads;
-	};
-
 	class task
 	{
 		class callable_base
 		{
 		public:
-			virtual void call() = 0;
+			virtual void invoke() = 0;
 			virtual ~callable_base() {}
 		};
 
@@ -48,7 +27,7 @@ class thread_pool
 		{
 		public:
 			callable(Function&& f) : _func(std::move(f)) {}
-			void call() override { _func(); }
+			void invoke() override { _func(); }
 
 		private:
 			Function _func;
@@ -68,7 +47,7 @@ class thread_pool
 		task(const task&) = delete;
 		task& operator=(const task&) = delete;
 
-		void run() { _callable->call(); }
+		void run() { _callable->invoke(); }
 
 	private:
 		std::unique_ptr<callable_base> _callable;
@@ -83,19 +62,19 @@ class thread_pool
 
 		void push(task task)
 		{
-			std::lock_guard<std::mutex> lock(_mutex);
+			std::scoped_lock<std::mutex> lock(_mutex);
 			_queue.push_front(std::move(task));
 		}
 
 		bool empty() const
 		{
-			std::lock_guard<std::mutex> lock(_mutex);
+			std::scoped_lock<std::mutex> lock(_mutex);
 			return _queue.empty();
 		}
 
 		bool try_pop(task* result)
 		{
-			std::lock_guard<std::mutex> lock(_mutex);
+			std::scoped_lock<std::mutex> lock(_mutex);
 
 			if (_queue.empty()) {
 				return false;
@@ -108,7 +87,7 @@ class thread_pool
 
 		bool try_steal(task* result)
 		{
-			std::lock_guard<std::mutex> lock(_mutex);
+			std::scoped_lock<std::mutex> lock(_mutex);
 
 			if (_queue.empty()) {
 				return false;
@@ -128,7 +107,6 @@ public:
 	thread_pool(size_t num_threads = std::thread::hardware_concurrency())
 		: _done(false)
 		, _queues(num_threads)
-		, _joiner(_threads)
 	{
 		try
 		{
@@ -213,12 +191,11 @@ private:
 		return false;
 	}
 
-	// declaration ordering is important for the destructor
 	std::atomic_bool _done;
 	blocking_queue<task> _pool_work_queue;
 	std::vector<work_stealing_queue> _queues;
-	std::vector<std::thread> _threads;
-	thread_guard _joiner;
-	static thread_local work_stealing_queue* s_local_work_queue;
-	static thread_local size_t s_local_thread_index;
+	std::vector<std::jthread> _threads;
+
+	static thread_local inline work_stealing_queue* s_local_work_queue;
+	static thread_local inline size_t s_local_thread_index;
 };

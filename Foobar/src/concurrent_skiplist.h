@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -22,7 +23,7 @@ class concurrent_skiplist
 
 		node(Key key, Value&& value, int levels)
 			: _key(std::move(key))
-			, _forward(std::make_unique<node* []>(levels))
+			, _forward(std::make_unique<node*[]>(levels))
 			, _forward_mutexes(std::make_unique<std::mutex[]>(levels))
 			, _top_level(levels - 1)
 			, _value(std::move(value))
@@ -91,9 +92,9 @@ class concurrent_skiplist
 
 		int get()
 		{
-			unsigned long long bits;
+			uint64_t bits;
 			{
-				std::lock_guard<std::mutex> lock(_random_engine_mutex);
+				std::scoped_lock<std::mutex> lock(_random_engine_mutex);
 				bits = _distribution(_generator);
 			}
 			
@@ -109,13 +110,13 @@ class concurrent_skiplist
 	private:
 		std::mutex _random_engine_mutex;
 		std::default_random_engine _generator;
-		const std::uniform_int_distribution<unsigned long long> _distribution;
+		const std::uniform_int_distribution<uint64_t> _distribution;
 	};
 
 public:
 	concurrent_skiplist()
-		: _head(new node(_max_levels))
-		, top_level_generator(_level_cap)
+		: _head(new node(MAX_LEVELS))
+		, top_level_generator(LEVEL_CAP)
 	{
 	}
 
@@ -124,7 +125,7 @@ public:
 		node* current = _head;
 		while (current)
 		{
-			node* next = current->forward(_bottom_level);
+			node* next = current->forward(BOTTOM_LEVEL);
 			delete current;
 			current = next;
 		}
@@ -175,20 +176,20 @@ public:
 
 	bool try_remove(const Key& key)
 	{
-		std::array<node*, _max_levels> update;
-		auto top_level_hint = _top_level_hint;
+		std::array<node*, MAX_LEVELS> update;
+		const auto top_level_hint = _top_level_hint;
 		node* current = search(key, top_level_hint, &update);
 		transferable_lock modify_lock;
 
 		while (true)
 		{
-			current = current->forward(_bottom_level);
+			current = current->forward(BOTTOM_LEVEL);
 			if (compare_greater(current, key)) {
 				return false;
 			}
 
 			modify_lock = current->lock_for_modify();
-			node* next = current->forward(_bottom_level);
+			const node* next = current->forward(BOTTOM_LEVEL);
 			bool is_garbage = compare_greater(current, next);
 			if (compare_equal(current, key) && !is_garbage) {
 				break;
@@ -202,11 +203,11 @@ public:
 			update[i] = _head;
 		}
 
-		for (int i = current->top_level(); i >= _bottom_level; --i)
+		for (int i = current->top_level(); i >= BOTTOM_LEVEL; --i)
 		{
 			node* previous = update[i];
-			auto previous_lock = find_and_lock(&previous, key, i);
-			auto current_lock = current->lock(i);
+			const auto previous_lock = find_and_lock(&previous, key, i);
+			const auto current_lock = current->lock(i);
 			previous->set_forward(current->forward(i), i);
 			current->set_forward(previous, i);
 		}
@@ -226,11 +227,11 @@ private:
 		bool add_if_no_exist,
 		bool update_if_exist)
 	{
-		std::array<node*, _max_levels> update;
+		std::array<node*, MAX_LEVELS> update;
 		auto top_level_hint = _top_level_hint;
 		auto previous = search(search_key, top_level_hint, &update);
-		auto previous_lock = find_and_lock(&previous, search_key, _bottom_level);
-		auto current = previous->forward(_bottom_level);
+		auto previous_lock = find_and_lock(&previous, search_key, BOTTOM_LEVEL);
+		auto current = previous->forward(BOTTOM_LEVEL);
 
 		if (compare_equal(current, search_key))
 		{
@@ -246,7 +247,7 @@ private:
 			return false;
 		}
 
-		auto top_level = top_level_generator.get();
+		const auto top_level = top_level_generator.get();
 		current = new node(search_key, std::move(value), top_level + 1);
 		auto modify_lock = current->lock_for_modify();
 
@@ -257,7 +258,7 @@ private:
 
 		for (int i = 0; i <= top_level; ++i)
 		{
-			if (i != _bottom_level)
+			if (i != BOTTOM_LEVEL)
 			{
 				previous = update[i];
 				previous_lock = find_and_lock(&previous, search_key, i);
@@ -273,14 +274,14 @@ private:
 		return true;
 	}
 
-	template<int array_size>
+	template<int ArraySize>
 	node* search(
 		const Key& search_key,
 		int top_level,
-		std::array<node*, array_size>* update)
+		std::array<node*, ArraySize>* update)
 	{
 		node* previous = _head;
-		for (int i = top_level; i >= _bottom_level; --i)
+		for (int i = top_level; i >= BOTTOM_LEVEL; --i)
 		{
 			auto current = previous->forward(i);
 			while (compare_less(current, search_key))
@@ -324,11 +325,11 @@ private:
 
 	void increase_top_level_hint()
 	{
-		if (_top_level_hint < _level_cap
+		if (_top_level_hint < LEVEL_CAP
 			&& _head->forward(_top_level_hint + 1) != nullptr
 			&& _top_level_hint_mutex.try_lock())
 		{
-			while (_top_level_hint < _level_cap
+			while (_top_level_hint < LEVEL_CAP
 				&& _head->forward(_top_level_hint + 1) != nullptr)
 			{
 				_top_level_hint = _top_level_hint + 1;
@@ -339,11 +340,11 @@ private:
 
 	void decrease_top_level_hint()
 	{
-		if (_top_level_hint > _bottom_level
+		if (_top_level_hint > BOTTOM_LEVEL
 			&& !_head->forward(_top_level_hint)
 			&& _top_level_hint_mutex.try_lock())
 		{
-			while (_top_level_hint > _bottom_level
+			while (_top_level_hint > BOTTOM_LEVEL
 				&& !_head->forward(_top_level_hint))
 			{
 				--_top_level_hint;
@@ -421,7 +422,7 @@ private:
 	std::mutex _top_level_hint_mutex;
 	top_level_generator top_level_generator;
 
-	static constexpr int _bottom_level = 0;
-	static constexpr int _max_levels = 32;
-	static constexpr int _level_cap = _max_levels - 1;
+	static constexpr int BOTTOM_LEVEL = 0;
+	static constexpr int MAX_LEVELS = 32;
+	static constexpr int LEVEL_CAP = MAX_LEVELS - 1;
 };
