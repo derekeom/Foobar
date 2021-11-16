@@ -130,7 +130,7 @@ public:
 	std::future<std::invoke_result_t<Function>> submit(Function func)
 	{
 		using result_t = std::invoke_result_t<Function>;
-		std::packaged_task<result_t()> task(func);
+		std::packaged_task<result_t()> task(std::move(func));
 		std::future<result_t> result(task.get_future());
 
 		if (s_local_work_queue) {
